@@ -653,7 +653,6 @@ def create_ichra_plans(file, year, metal_levels):
     ichra_file = load_workbook(file)
     ichra_wb = ichra_file.active
     ichra_row = 2
-    complete_plans = []
     # API Key and the url for searching plans
     key = "LRnyaUBUc97sbfT9FSy5US2UtbdiryA5"
     plan_url = "https://marketplace.api.healthcare.gov/api/v1/plans/search?apikey=" + key + "&year=" + str(year)
@@ -681,18 +680,29 @@ def create_ichra_plans(file, year, metal_levels):
         "order": "asc",
         "year": int(year)
     }
+    # Create a plan list to keep track of plan names
+    plan_list = []
 
     # Go through every applicable row of the sheet, skipping over dependents
     while ichra_wb.cell(row=ichra_row, column=1).value is not None:
         if ichra_wb.cell(row=ichra_row, column=7).value is not None:
             # Retrieve the member county by sending a GET request and placing the results in the marketplace body
-            zipcode = str(ichra_wb.cell(row=ichra_row, column=8).value)
-            county_url = "https://marketplace.api.healthcare.gov/api/v1/counties/by/zip/" + zipcode + "?apikey=" + key
-            county_query = requests.get(county_url, headers={'Content-Type': 'application/json'}).json()["counties"][0]
+            try:
+                zipcode = str(ichra_wb.cell(row=ichra_row, column=8).value)
+                county_url = \
+                    "https://marketplace.api.healthcare.gov/api/v1/counties/by/zip/" + zipcode + "?apikey=" + key
+                county_query = \
+                    requests.get(county_url, headers={'Content-Type': 'application/json'}).json()["counties"][0]
+            except(IndexError, Exception):
+                print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value
+                      + " - Plans retrieved: 0 - County Not Found")
+                ichra_row += 1
+                continue
+            # If counties have been retrieved, complete the remaining actions
             marketplace_body["place"]["countyfips"] = county_query["fips"]
             marketplace_body["place"]["state"] = county_query["state"]
             marketplace_body["place"]["zipcode"] = county_query["zipcode"]
-            # Add DoB of main members
+            # Add DoB of main members, formatting it correctly
             marketplace_body["household"]["people"][0]["dob"] = \
                 ichra_wb.cell(row=ichra_row, column=4).value.strftime("%Y-%m-%d")
             # Remove any previous dependents and check for dependents of the current member
@@ -709,21 +719,27 @@ def create_ichra_plans(file, year, metal_levels):
                 dep_i += 1
             # Create the a list of plans for this row
             row_plan = generate_plan_dict(plan_url, marketplace_body)
-            complete_plans.append(row_plan)
 
-            plan_list = []
             for plan in row_plan:
-                col = 10
                 # If the plan is not in the list, set up a column for it
                 if plan[1] not in plan_list:
-                    col = 10 + len(plan_list)
                     plan_list.append(plan[1])
-                    ichra_wb.cell(row=0, column=col).value = plan[1] + " (" + plan[4] + " Ded)"
+                    col = 9 + len(plan_list)
+                    # Get the correct Ded amount to add onto the column
+                    mult = 1 if len(marketplace_body["household"]["people"]) == 1 else 2
+                    # Place the plan title onto the column
+                    # print(plan[1] + "\n(" + str(plan[3] * mult) + "/" + str(plan[3] * mult * 2) + " Ded)")
+                    ichra_wb.cell(row=1, column=col).value = \
+                        plan[1] + "\n(" + str(plan[3] * mult) + "/" + str(plan[3] * mult * 2) + " Ded)"
                 # If the plan is already in the list, go to that plan column
                 else:
-                    col = plan_list.index(plan[1])
-                # Place the correct amount
-                ichra_wb.cell(row=0, column=col).value = plan[2]
+                    col = 10 + plan_list.index(plan[1])
+                # Place the premium into the correct row and column
+                # ichra_wb.cell(row=ichra_row, column=col).value = plan[2]
+                premium = ichra_wb.cell(row=ichra_row, column=col)
+                premium.value = plan[2]
+                premium.number_format = '$#.##'
+                # print(str(ichra_row) + " : " + str(col) + " : " + str(plan[2]))
 
             print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value +
                   " - Plans retrieved: " + str(len(row_plan)) + " - " + county_query["name"])
@@ -731,7 +747,6 @@ def create_ichra_plans(file, year, metal_levels):
         ichra_row += 1
 
     ichra_file.save(filename=file)
-    return complete_plans
 
 
 def generate_plan_dict(url, body):
