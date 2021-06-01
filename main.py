@@ -334,6 +334,7 @@ class Interface:
         Button(win, text='Submit', width=40, command=lambda: fill_and_destroy(entry.get())).grid(
             row=4, columnspan=2, pady=2)
 
+        # Note to self: Find a more efficient way of doing this
         var1 = tk.IntVar()
         var2 = tk.IntVar()
         var3 = tk.IntVar()
@@ -352,31 +353,30 @@ class Interface:
 
         def fill_and_destroy(year):
             win.destroy()
-            try:
-                if year is "":
-                    year = functions.get_current_year()
-                # Find a more efficient way of doing getting the metal levels
-                metal_levels = []
-                if var1.get():
-                    metal_levels.append("Bronze")
-                if var2.get():
-                    metal_levels.append("Silver")
-                if var3.get():
-                    metal_levels.append("Gold")
-                if var4.get():
-                    metal_levels.append("Platinum")
-                if var5.get():
-                    metal_levels.append("Catastrophic")
-                self.Output.insert(tk.END, "Creating ICHRA...\n")
-                plans = functions.create_ichra_census(self.Excel_File, year, metal_levels)
-                self.Output.insert(tk.END, "ICHRA has been generated!\n")
-                print(len(plans))
-                for x in range(0, len(plans)):
-                    print(plans[x])
-            except(PermissionError, Exception):
-                self.Output.insert(tk.END, "Error: Please close the selected file and try again\n")
-            except(ValueError, Exception):
-                self.Output.insert(tk.END, "An error has occurred\n")
+            # try:
+            if year is "":
+                year = functions.get_current_year()
+            # Find a more efficient way of doing getting the metal levels
+            metal_levels = []
+            if var1.get():
+                metal_levels.append("Bronze")
+            if var2.get():
+                metal_levels.append("Silver")
+            if var3.get():
+                metal_levels.append("Gold")
+            if var4.get():
+                metal_levels.append("Platinum")
+            if var5.get():
+                metal_levels.append("Catastrophic")
+            self.Output.insert(tk.END, "Creating ICHRA...\n")
+            # Create the plans and input all the data
+            # We won't need to specify which plans would be needed or not. Just input all of them
+            functions.create_ichra_plans(self.Excel_File, year, metal_levels)
+            self.Output.insert(tk.END, "ICHRA has been generated!\n")
+            # except(PermissionError, Exception):
+            #     self.Output.insert(tk.END, "Error: Please close the selected file and try again\n")
+            # except(ValueError, Exception):
+            #     self.Output.insert(tk.END, "An error has occurred\n")
 
 
 root = Tk()

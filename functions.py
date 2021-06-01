@@ -648,9 +648,9 @@ def create_ft_census(file, wait):
 
 # Auto-fill the ICHRA quoting census, using the Marketplace API to retrieve quotes for each member
 # Key: LRnyaUBUc97sbfT9FSy5US2UtbdiryA5
-def create_ichra_census(file, year, metal_levels):
+def create_ichra_plans(file, year, metal_levels):
     # Load the selected file
-    ichra_file = load_workbook(file, data_only=True)
+    ichra_file = load_workbook(file)
     ichra_wb = ichra_file.active
     ichra_row = 2
     complete_plans = []
@@ -707,17 +707,26 @@ def create_ichra_census(file, year, metal_levels):
                     "utilization_level": "Low"
                 })
                 dep_i += 1
-            # Create the plan list
-            row_plans = generate_plan_dict(plan_url, marketplace_body)
-            complete_plans.append(row_plans)
-            print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value +
-                  " - Plans retrieved: " + str(len(row_plans)) + " - " + county_query["name"])
-            # print(row_plans)
+            # Create the a list of plans for this row
+            row_plan = generate_plan_dict(plan_url, marketplace_body)
+            complete_plans.append(row_plan)
 
-            # TODO: Place the retrieved data onto the spreadsheet
-            # Should I open a user prompt to select which plans to add? Or attempt to find the specific plans
-            # ichra_wb.cell(row=ichra_row, column=9).value = county_query["name"]
-            # ichra_wb.cell(row=ichra_row, column=11).value = row_plans[0][2]
+            plan_list = []
+            for plan in row_plan:
+                col = 10
+                # If the plan is not in the list, set up a column for it
+                if plan[1] not in plan_list:
+                    col = 10 + len(plan_list)
+                    plan_list.append(plan[1])
+                    ichra_wb.cell(row=0, column=col).value = plan[1] + " (" + plan[4] + " Ded)"
+                # If the plan is already in the list, go to that plan column
+                else:
+                    col = plan_list.index(plan[1])
+                # Place the correct amount
+                ichra_wb.cell(row=0, column=col).value = plan[2]
+
+            print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value +
+                  " - Plans retrieved: " + str(len(row_plan)) + " - " + county_query["name"])
 
         ichra_row += 1
 
