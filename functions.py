@@ -1,5 +1,7 @@
+import re
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font, Alignment
+from openpyxl.utils import get_column_letter
 from shutil import copy2
 from datetime import datetime
 import os
@@ -11,6 +13,8 @@ import csv
 # import json
 # import urllib.request
 import requests
+
+
 # import pyexcel as p
 
 
@@ -683,6 +687,9 @@ def create_ichra_plans(file, year, metal_levels):
     # Create a plan list to keep track of plan names
     plan_list = []
 
+    # Remove any previous plans from the spread
+    ichra_wb.delete_cols(10, 200)
+
     # Go through every applicable row of the sheet, skipping over dependents
     while ichra_wb.cell(row=ichra_row, column=1).value is not None:
         if ichra_wb.cell(row=ichra_row, column=7).value is not None:
@@ -708,10 +715,10 @@ def create_ichra_plans(file, year, metal_levels):
             # Remove any previous dependents and check for dependents of the current member
             marketplace_body["household"]["people"] = marketplace_body["household"]["people"][0:1]
             dep_i = 1
-            while ichra_wb.cell(row=ichra_row+dep_i, column=7).value is None and \
-                    ichra_wb.cell(row=ichra_row+dep_i, column=1).value is not None:
+            while ichra_wb.cell(row=ichra_row + dep_i, column=7).value is None and \
+                    ichra_wb.cell(row=ichra_row + dep_i, column=1).value is not None:
                 marketplace_body["household"]["people"].append({
-                    "dob": ichra_wb.cell(row=ichra_row+dep_i, column=4).value.strftime("%Y-%m-%d"),
+                    "dob": ichra_wb.cell(row=ichra_row + dep_i, column=4).value.strftime("%Y-%m-%d"),
                     "has_mec": False,
                     "uses_tobacco": False,
                     "utilization_level": "Low"
@@ -724,13 +731,17 @@ def create_ichra_plans(file, year, metal_levels):
                 # If the plan is not in the list, set up a column for it
                 if plan[1] not in plan_list:
                     plan_list.append(plan[1])
+                    # Go to the correct column
                     col = 9 + len(plan_list)
-                    # Get the correct Ded amount to add onto the column
-                    mult = 1 if len(marketplace_body["household"]["people"]) == 1 else 2
-                    # Place the plan title onto the column
-                    # print(plan[1] + "\n(" + str(plan[3] * mult) + "/" + str(plan[3] * mult * 2) + " Ded)")
-                    ichra_wb.cell(row=1, column=col).value = \
-                        plan[1] + "\n(" + str(plan[3] * mult) + "/" + str(plan[3] * mult * 2) + " Ded)"
+                    # Change column width to fit the new plan a bit easier
+                    ichra_wb.column_dimensions[get_column_letter(col)].width = 20
+                    # Get the correct Ded amount and create the title
+                    mult = 1 if len(marketplace_body["household"]["people"]) > 1 else 2
+                    title = ichra_wb.cell(row=1, column=col)
+                    title.value = re.sub(r'\([^()]*\)', '', plan[1]) + "\n(" + str(int(plan[3] * mult / 2)) + "/" + str(
+                        plan[3] * mult) + " Ded)"
+                    title.font = Font(bold=True)
+                    title.alignment = Alignment(wrap_text=True)
                 # If the plan is already in the list, go to that plan column
                 else:
                     col = 10 + plan_list.index(plan[1])
@@ -738,13 +749,23 @@ def create_ichra_plans(file, year, metal_levels):
                 # ichra_wb.cell(row=ichra_row, column=col).value = plan[2]
                 premium = ichra_wb.cell(row=ichra_row, column=col)
                 premium.value = plan[2]
-                premium.number_format = '$#.##'
+                premium.number_format = '$#.00'
                 # print(str(ichra_row) + " : " + str(col) + " : " + str(plan[2]))
 
             print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value +
                   " - Plans retrieved: " + str(len(row_plan)) + " - " + county_query["name"])
 
         ichra_row += 1
+
+    # Once the loop has been completed, add the totals
+    total = ichra_wb.cell(row=ichra_row + 1, column=9)
+    total.value = "Totals"
+    total.font = Font(bold=True)
+    for t_col in range(10, 10 + len(plan_list)):
+        ichra_wb.cell(row=ichra_row + 1, column=t_col).font = Font(bold=True)
+        ichra_wb.cell(row=ichra_row + 1, column=t_col).number_format = "$0.00"
+        ichra_wb.cell(row=ichra_row + 1, column=t_col).value = \
+            "=SUM(" + get_column_letter(t_col) + "2:" + get_column_letter(t_col) + str(ichra_row - 1) + ")"
 
     ichra_file.save(filename=file)
 
