@@ -5,16 +5,13 @@ from openpyxl.utils import get_column_letter
 from shutil import copy2
 from datetime import datetime
 import os
-# import re
 import warnings
 from collections import defaultdict
 import xlrd
 import csv
+import requests
 # import json
 # import urllib.request
-import requests
-
-
 # import pyexcel as p
 
 
@@ -45,19 +42,17 @@ def get_current_year():
 def check_input_file(file):
     wb = load_workbook(file, read_only=True)
     ws = wb.active
-    try:
-        # ICHRA File
-        if "Age" in ws.cell(row=1, column=5).value:
-            return 3
-        # 1095 File
-        elif "LAST NAME" in ws.cell(row=7, column=1).value:
-            return 2
-        # Census file
-        elif "First Name" in ws.cell(row=1, column=1).value:
-            return 1
-        else:
-            return 0
-    except(ValueError, TypeError):
+
+    # ICHRA File
+    if "Age" in str(ws.cell(row=1, column=5).value):
+        return 3
+    # 1095 File
+    elif "LAST NAME" in str(ws.cell(row=7, column=1).value):
+        return 2
+    # Census file
+    elif "First Name" in str(ws.cell(row=1, column=1).value):
+        return 1
+    else:
         return 0
 
 
@@ -79,7 +74,7 @@ def rename(file_loc, old_name, template):
     if os.path.exists(new_name):
         os.remove(new_name)
     os.rename(old_name, new_name)
-    # TODO: This is bugged. It doesn't the Anthem census back to .xls
+    # TODO: This is bugged. It doesn't change the Anthem census back to .xls
     # if template is "1":
     #     p.save_book_as(file_name=new_name, dest_file_name=new_name[:-1])
     #     os.remove(new_name)
