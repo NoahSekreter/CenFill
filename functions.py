@@ -711,7 +711,7 @@ def create_ichra_plans(file, year, metal_levels):
                 continue
             # If counties have been retrieved, add the county name to the row and complete the remaining actions
             if ichra_wb.cell(row=ichra_row, column=9).value is None:
-                ichra_wb.cell(row=ichra_row, column=9).value = str(county_query["name"]).strip(" County")
+                ichra_wb.cell(row=ichra_row, column=9).value = str(county_query["name"])[:-7]
             marketplace_body["place"]["countyfips"] = county_query["fips"]
             marketplace_body["place"]["state"] = county_query["state"]
             marketplace_body["place"]["zipcode"] = county_query["zipcode"]
