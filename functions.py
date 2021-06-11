@@ -655,7 +655,8 @@ def create_ichra_plans(file, year, metal_levels):
     # API Key and the url for searching plans
     key = "LRnyaUBUc97sbfT9FSy5US2UtbdiryA5"
     plan_url = "https://marketplace.api.healthcare.gov/api/v1/plans/search?apikey=" + key + "&year=" + str(year)
-    # Set up the body for the request
+    # Set up the header and body for the request
+    hdr = {'Content-Type': 'application/json'}
     marketplace_body = {
         "household": {
             "people": [{
@@ -693,14 +694,24 @@ def create_ichra_plans(file, year, metal_levels):
                 zipcode = str(ichra_wb.cell(row=ichra_row, column=8).value)
                 county_url = \
                     "https://marketplace.api.healthcare.gov/api/v1/counties/by/zip/" + zipcode + "?apikey=" + key
-                county_query = \
-                    requests.get(county_url, headers={'Content-Type': 'application/json'}).json()["counties"][0]
+                county_query = requests.get(county_url, headers=hdr).json()["counties"]
+                found_county = False
+                if ichra_wb.cell(row=ichra_row, column=9).value is not None:
+                    for county in county_query:
+                        if ichra_wb.cell(row=ichra_row, column=9).value in county["name"]:
+                            county_query = county
+                            found_county = True
+                            break
+                if not found_county:
+                    county_query = county_query[0]
             except(IndexError, Exception):
                 print(ichra_wb.cell(row=ichra_row, column=1).value + " " + ichra_wb.cell(row=ichra_row, column=2).value
                       + " - Plans retrieved: 0 - County Not Found")
                 ichra_row += 1
                 continue
-            # If counties have been retrieved, complete the remaining actions
+            # If counties have been retrieved, add the county name to the row and complete the remaining actions
+            if ichra_wb.cell(row=ichra_row, column=9).value is None:
+                ichra_wb.cell(row=ichra_row, column=9).value = str(county_query["name"]).strip(" County")
             marketplace_body["place"]["countyfips"] = county_query["fips"]
             marketplace_body["place"]["state"] = county_query["state"]
             marketplace_body["place"]["zipcode"] = county_query["zipcode"]
@@ -720,7 +731,7 @@ def create_ichra_plans(file, year, metal_levels):
                 })
                 dep_i += 1
             # Create the a list of plans for this row
-            row_plan = generate_plan_dict(plan_url, marketplace_body)
+            row_plan = generate_plan_dict(plan_url, hdr, marketplace_body)
 
             for plan in row_plan:
                 # If the plan is not in the list, set up a column for it
@@ -765,13 +776,13 @@ def create_ichra_plans(file, year, metal_levels):
     ichra_file.save(filename=file)
 
 
-def generate_plan_dict(url, body):
+def generate_plan_dict(url, header, body):
     # Set up a plan array, going through the full query and retrieve the name, premium amount, and deductibles
     plan_array = []
     plan_loop = True
     # Retrieve a dictionary of plans
     while plan_loop:
-        plan_query = requests.post(url, headers={'Content-Type': 'application/json'}, json=body).json()["plans"]
+        plan_query = requests.post(url, headers=header, json=body).json()["plans"]
         for i in range(0, len(plan_query)):
             plan_array.append([plan_query[i]["issuer"]["name"], plan_query[i]["name"], plan_query[i]["premium"],
                                plan_query[i]["deductibles"][0]["amount"]])
